@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>강남대 학사정보 챗봇</title>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f4f6f9; display: flex; justify-content: center; padding: 50px; }
+        .chat-container { width: 450px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; display: flex; flex-direction: column; height: 600px; }
+        .header { background: #003366; color: white; padding: 20px; text-align: center; font-weight: bold; font-size: 18px; }
+        .chat-box { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        .msg { max-width: 80%; padding: 12px; border-radius: 8px; line-height: 1.5; font-size: 14px; }
+        .user-msg { background: #00A3C4; color: white; align-self: flex-end; border-bottom-right-radius: 0; }
+        .bot-msg { background: #E2E8F0; color: #333; align-self: flex-start; border-bottom-left-radius: 0; }
+        .sources { font-size: 11px; color: #666; margin-top: 5px; border-top: 1px solid #ccc; padding-top: 5px; }
+        .input-area { display: flex; padding: 15px; border-top: 1px solid #eee; background: white; }
+        input { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 6px; outline: none; }
+        button { background: #003366; color: white; border: none; padding: 10px 15px; margin-left: 10px; border-radius: 6px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="header">강남대 학칙 RAG 챗봇</div>
+        <div class="chat-box" id="chatBox">
+            <div class="msg bot-msg">안녕하세요! 강남대학교 수강 규정 및 학칙에 대해 무엇이든 물어보세요.</div>
+        </div>
+        <div class="input-area">
+            <input type="text" id="userInput" placeholder="질문을 입력하세요... (예: 졸업 학점은 몇 점이야?)" onkeypress="if(event.key === 'Enter') sendMessage()">
+            <button onclick="sendMessage()">전송</button>
+        </div>
+    </div>
+
+    <script>
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const chatBox = document.getElementById('chatBox');
+            const question = input.value.trim();
+            if (!question) return;
+
+            // 사용자 메시지 추가
+            chatBox.innerHTML += `<div class="msg user-msg">${question}</div>`;
+            input.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                // FastAPI 서버로 요청
+                const response = await fetch('http://localhost:8000/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: question })
+                });
+                
+                const data = await response.json();
+                
+                // 봇 응답 추가 (출처 포함)
+                let botHtml = `<div class="msg bot-msg">${data.answer}`;
+
+                // PDF 출처
+                if (data.sources && data.sources.length > 0) {
+                    const list = data.sources
+                        .map(s => s.filename + (s.page ? ` (p.${s.page})` : ''))
+                        .join(', ');
+                    botHtml += `<div class="sources">참고 조항: ${list}</div>`;
+                }
+
+                // 웹 출처 (PDF에 없어 강남대 사이트에서 가져온 경우)
+                if (data.web_sources && data.web_sources.length > 0) {
+                    const list = data.web_sources
+                        .map(s => `<a href="${s.url}" target="_blank">${s.url}</a>`)
+                        .join(', ');
+                    botHtml += `<div class="sources">웹 출처: ${list}</div>`;
+                }
+
+                botHtml += `</div>`;
+                chatBox.innerHTML += botHtml;
+                chatBox.scrollTop = chatBox.scrollHeight;
+
+    </script>
+</body>
+</html>
